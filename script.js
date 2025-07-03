@@ -1,115 +1,118 @@
-let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-let audioBuffer;
+// script.js
 
-document.getElementById('thresholdSlider').addEventListener('input', function () {
-    document.getElementById('thresholdValue').textContent = this.value + ' dB';
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let audioBuffer = null;
+
+// UI elements
+const thresholdSlider = document.getElementById('thresholdSlider');
+const thresholdValue  = document.getElementById('thresholdValue');
+const ratioSelect     = document.getElementById('ratioSelect');
+const kneeSlider      = document.getElementById('kneeSlider');
+const kneeValue       = document.getElementById('kneeValue');
+const applyBtn        = document.getElementById('applyBtn');
+const audioPlayer     = document.getElementById('audioPlayer');
+
+// Update labels
+thresholdSlider.addEventListener('input', () => {
+  thresholdValue.textContent = `${thresholdSlider.value} dB`;
+});
+kneeSlider.addEventListener('input', () => {
+  kneeValue.textContent = `${kneeSlider.value} dB`;
 });
 
-document.getElementById('audioFile').addEventListener('change', function (event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            audioContext.decodeAudioData(e.target.result, function (buffer) {
-                audioBuffer = buffer;
-                console.log("Audio cargado correctamente.");
-            });
-        };
-        reader.readAsArrayBuffer(file);
-    }
+// Load and decode audio
+document.getElementById('audioFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    audioBuffer = await new Promise((res, rej) =>
+      audioContext.decodeAudioData(arrayBuffer, res, rej)
+    );
+    console.log('✅ Audio cargado y decodificado.');
+  } catch (err) {
+    console.error('❌ Error al decodificar audio:', err);
+    alert('No se pudo cargar el audio. Revisa la consola para más detalles.');
+  }
 });
 
-function applyLimiter() {
-    if (!audioBuffer) return alert("Primero carga un archivo de audio.");
+// Apply limiting with DynamicsCompressorNode
+applyBtn.addEventListener('click', async () => {
+  if (!audioBuffer) {
+    return alert('Primero carga un archivo de audio.');
+  }
 
-    const thresholdDb = parseFloat(document.getElementById('thresholdSlider').value);
-    const threshold = Math.pow(10, thresholdDb / 20); 
-    const ratio = parseFloat(document.getElementById('ratioSelect').value);
+  const thresholdDb = parseFloat(thresholdSlider.value);
+  const ratio       = parseFloat(ratioSelect.value);
+  const kneeDb      = parseFloat(kneeSlider.value);
+  const attackSec   = 0.003;  // 3 ms
+  const releaseSec  = 0.250;  // 250 ms
 
-    const limitedBuffer = audioContext.createBuffer(
-        audioBuffer.numberOfChannels,
-        audioBuffer.length,
-        audioBuffer.sampleRate
-    );
+  const offlineCtx = new OfflineAudioContext(
+    audioBuffer.numberOfChannels,
+    audioBuffer.length,
+    audioBuffer.sampleRate
+  );
 
-    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
-        const input = audioBuffer.getChannelData(ch);
-        const output = limitedBuffer.getChannelData(ch);
+  const source     = offlineCtx.createBufferSource();
+  source.buffer    = audioBuffer;
+  const compressor = offlineCtx.createDynamicsCompressor();
 
-        for (let i = 0; i < input.length; i++) {
-            const x = input[i];
-            const absX = Math.abs(x);
+  // Set compressor params
+  compressor.threshold.value = thresholdDb;
+  compressor.ratio.value     = ratio;
+  compressor.knee.value      = kneeDb;
+  compressor.attack.value    = attackSec;
+  compressor.release.value   = releaseSec;
 
-            if (absX <= threshold) {
-                output[i] = x;
-            } else {
-                output[i] = Math.sign(x) * (threshold + (absX - threshold) / ratio);
-            }
-        }
-    }
+  source.connect(compressor).connect(offlineCtx.destination);
+  source.start(0);
 
-    exportBuffer(limitedBuffer);
-}
+  let renderedBuffer;
+  try {
+    renderedBuffer = await offlineCtx.startRendering();
+  } catch (err) {
+    console.error('❌ Error al renderizar:', err);
+    return alert('Fallo al procesar el audio.');
+  }
 
-function exportBuffer(buffer) {
-    const offlineCtx = new OfflineAudioContext(
-        buffer.numberOfChannels,
-        buffer.length,
-        buffer.sampleRate
-    );
-    const source = offlineCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(offlineCtx.destination);
-    source.start(0);
+  const wavData = audioBufferToWav(renderedBuffer);
+  const blob    = new Blob([wavData], { type: 'audio/wav' });
+  audioPlayer.src = URL.createObjectURL(blob);
+});
 
-    offlineCtx.startRendering().then(renderedBuffer => {
-        const wav = audioBufferToWav(renderedBuffer);
-        const blob = new Blob([wav], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        document.getElementById('audioPlayer').src = url;
-    });
-}
-
+// Convert AudioBuffer to WAV
 function audioBufferToWav(buffer) {
-    const numOfChan = buffer.numberOfChannels;
-    const length = buffer.length * numOfChan * 2 + 44;
-    const bufferView = new ArrayBuffer(length);
-    const view = new DataView(bufferView);
+  const numChan = buffer.numberOfChannels;
+  const len     = buffer.length * numChan * 2 + 44;
+  const bufView = new ArrayBuffer(len);
+  const dv      = new DataView(bufView);
+  let offset    = 0;
 
-    let offset = 0;
+  function writeStr(s) { for (let i = 0; i < s.length; i++) dv.setUint8(offset++, s.charCodeAt(i)); }
+  function writeInt16(v) { dv.setInt16(offset, v, true); offset += 2; }
 
-    function writeString(str) {
-        for (let i = 0; i < str.length; i++) {
-            view.setUint8(offset++, str.charCodeAt(i));
-        }
+  writeStr('RIFF');
+  dv.setUint32(offset, len - 8, true); offset += 4;
+  writeStr('WAVEfmt ');
+  dv.setUint32(offset, 16, true); offset += 4;
+  dv.setUint16(offset, 1, true);  offset += 2;
+  dv.setUint16(offset, numChan, true); offset += 2;
+  dv.setUint32(offset, buffer.sampleRate, true); offset += 4;
+  dv.setUint32(offset, buffer.sampleRate * numChan * 2, true); offset += 4;
+  dv.setUint16(offset, numChan * 2, true); offset += 2;
+  dv.setUint16(offset, 16, true); offset += 2;
+  writeStr('data');
+  dv.setUint32(offset, buffer.length * numChan * 2, true); offset += 4;
+
+  for (let i = 0; i < buffer.length; i++) {
+    for (let ch = 0; ch < numChan; ch++) {
+      let s = buffer.getChannelData(ch)[i];
+      s     = Math.max(-1, Math.min(1, s));
+      writeInt16(s * 0x7FFF);
     }
+  }
 
-    function writeInt16(val) {
-        view.setInt16(offset, val, true);
-        offset += 2;
-    }
-
-    writeString('RIFF');
-    view.setUint32(offset, length - 8, true); offset += 4;
-    writeString('WAVE');
-    writeString('fmt ');
-    view.setUint32(offset, 16, true); offset += 4;
-    view.setUint16(offset, 1, true); offset += 2;
-    view.setUint16(offset, numOfChan, true); offset += 2;
-    view.setUint32(offset, buffer.sampleRate, true); offset += 4;
-    view.setUint32(offset, buffer.sampleRate * numOfChan * 2, true); offset += 4;
-    view.setUint16(offset, numOfChan * 2, true); offset += 2;
-    view.setUint16(offset, 16, true); offset += 2;
-    writeString('data');
-    view.setUint32(offset, buffer.length * numOfChan * 2, true); offset += 4;
-
-    for (let i = 0; i < buffer.length; i++) {
-        for (let channel = 0; channel < numOfChan; channel++) {
-            let sample = buffer.getChannelData(channel)[i];
-            sample = Math.max(-1, Math.min(1, sample));
-            writeInt16(sample * 0x7FFF);
-        }
-    }
-
-    return view;
+  return bufView;
 }

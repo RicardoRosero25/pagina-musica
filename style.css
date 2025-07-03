@@ -1,51 +1,122 @@
-/* Fuente y fondo */
+/* style.css */
+
+:root {
+  /* Degradado oscuro y moderno */
+  --bg-color: linear-gradient(135deg, #1f1f2e, #353545);
+  --card-color: #2a2a3d;
+  --primary: #82aaff;
+  --secondary: #abb2bf;
+  --text: #e1e1e6;
+  --radius: 8px;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --spacing: 1rem;
+  --font: 'Segoe UI', Tahoma, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-    color: #fff;
-    margin: 0;
-    padding: 40px;
+  margin: 0;
+  padding: 0;
+  background: var(--bg-color);
+  font-family: var(--font);
+  color: var(--text);
 }
 
-/* Encabezado */
-h1 {
-    font-size: 2em;
-    margin-bottom: 20px;
-    color: #00ffff;
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: var(--spacing);
+  background: var(--card-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
-/* Inputs y botones */
-input[type="file"], button {
-    display: block;
-    margin: 15px 0;
-    padding: 12px 18px;
-    font-size: 1em;
-    border: none;
-    border-radius: 10px;
-    transition: background 0.3s ease;
+header h1 {
+  margin: 0 0 0.5rem;
+  color: var(--primary);
+  text-align: center;
 }
 
-/* Botón */
-button {
-    background-color: #00bcd4;
-    color: #fff;
-    cursor: pointer;
-}
-button:hover {
-    background-color: #0097a7;
+header h2 {
+  margin: 0 0 2rem;
+  font-size: 1rem;
+  font-weight: 400;
+  text-align: center;
+  color: var(--secondary);
 }
 
-/* Reproductor de audio */
-audio {
-    margin-top: 20px;
-    width: 100%;
-    max-width: 600px;
+.controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: var(--spacing);
+  margin-bottom: 2rem;
 }
 
-/* Centrar todo */
-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+.control {
+  display: flex;
+  flex-direction: column;
+}
+
+.control label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.control input[type="range"],
+.control select,
+.control input[type="file"] {
+  padding: 0.5rem;
+  background: #1f1f2e;
+  border: 1px solid #44445a;
+  color: var(--text);
+  border-radius: var(--radius);
+}
+
+button#applyBtn {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+button#applyBtn:hover {
+  filter: brightness(1.1);
+}
+
+.player h3 {
+  margin-bottom: 0.5rem;
+  color: var(--secondary);
+}
+
+.player audio {
+  width: 100%;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: #1f1f2e;
+}
+
+.info {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.info h3 {
+  margin-bottom: var(--spacing);
+  color: var(--text);
+}
+
+.info img {
+  max-width: 100%;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
